@@ -7,7 +7,7 @@ USE crm;
 CREATE TABLE Companies (
     company_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    description TEXT
+    description TEXT 
 );
 
 -- Creating Customers Table

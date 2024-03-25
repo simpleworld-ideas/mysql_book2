@@ -108,6 +108,109 @@ async function main() {
    
     })
 
+    app.get("/delete-customers/:customerId", async function(req,res){
+        const { customerId} = req.params; // same as `const customerId = req.params.customerId`
+        const query = `SELECT * FROM Customers WHERE customer_id = ?`;
+        
+        // connection.execute with a SELECT statement 
+        // you always get an array as a result even if there ONLY one possible result
+        const [customers] = await connection.execute(query, [customerId]);
+        const customerToDelete = customers[0];
+
+        res.render('delete-customers', {
+            'customer': customerToDelete
+        })
+
+    })
+
+    app.post('/delete-customers/:customerId', async function(req,res){
+        const {customerId} = req.params;
+
+        // check if the customerId in a relationship with an employee
+        const checkCustomerQuery = `SELECT * FROM EmployeeCustomer WHERE customer_id = ?`;
+        const [involved] = await connection.execute(checkCustomerQuery, [customerId]);
+        if (involved.length > 0) {
+            res.send("Unable to delete because the customer is in a sales relationship of an employee");
+            return;
+        }
+
+        const query = `DELETE FROM Customers WHERE customer_id = ?`;
+        await connection.execute(query, [customerId]);
+        res.redirect('/customers');
+    })
+
+    app.get('/update-customers/:customerId', async function(req,res){
+        const { customerId} = req.params;
+        
+        const query = `SELECT * FROM Customers WHERE customer_id =?;`
+        const [customers] = await connection.execute(query, [customerId]);
+        const wantedCustomer = customers[0];
+       
+        const [companies] = await connection.execute("SELECT * FROM Companies");
+        const [employees] = await connection.execute("SELECT * FROM Employees")
+        
+        // get all the employees that are currently serving the customer
+        const [currentEmployees] = await connection.execute(`SELECT * FROM EmployeeCustomer 
+                WHERE customer_id = ?`, [customerId]);
+
+        console.log(currentEmployees);
+
+        // const employeeIds = currentEmployees.map(function(e){
+        //     return e.employee_id;
+        // })
+
+        const employeeIds = [];
+        for (let e of currentEmployees) {
+            employeeIds.push(e.employee_id)
+        }
+
+
+        res.render('update-customer',{
+            'customer': wantedCustomer,
+            companies,
+            employees,
+            employeeIds
+        })
+    })
+
+    app.post('/update-customers/:customerId', async function(req,res){
+        const {customerId} = req.params;
+        const {first_name, last_name, rating, company_id} = req.body;
+        const query = `UPDATE Customers SET first_name=?,
+                        last_name=?, 
+                        rating=?,
+                        company_id=?
+                       WHERE customer_id = ?;`
+    
+        // update the customer first
+        await connection.execute(query, [first_name, last_name, rating, company_id, customerId]);
+        
+        // 1. update the relationship by first DELETE all M:N relationships
+        await connection.execute("DELETE FROM EmployeeCustomer WHERE customer_id = ?", [customerId]);
+
+        // 2. add back the relationship that is selected by the user
+        // ADD IN M:N relationship after the creating the row
+        // We have to do so because the primary key is only available after the insert
+        const { employees } = req.body; // same as `const employees = req.body.employees`
+        
+        let employeeArray = [];
+        if (Array.isArray(employees)) {
+            employeeArray = employees;
+        } else {
+            employeeArray.push(employees);
+        }
+
+        for (let employee_id of employeeArray) {
+            await connection.execute(`INSERT INTO EmployeeCustomer (employee_id, customer_id) 
+                                VALUES (?, ?)
+            `, [employee_id, customerId])
+        }
+        res.redirect('/customers');
+        
+    })
+
+
+
 }
 
 main();
