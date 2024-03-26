@@ -165,7 +165,7 @@ async function main() {
         }
 
 
-        res.render('update-customer',{
+        res.render('update-customers',{
             'customer': wantedCustomer,
             companies,
             employees,
@@ -208,6 +208,9 @@ async function main() {
         res.redirect('/customers');
         
     })
+
+
+
 
 
 
